@@ -1,0 +1,114 @@
+Proyecto en el cual se desarrolla una API rest. Pero...primero, que es?
+
+Una API REST es un conjunto de normas y convenciones que permite la comunicación entre sistemas a través de la web utilizando el protocolo HTTP.
+
+**Algunas de sus características son:**
+
+-   **Uso del protocolo HTTP**: La comunicación se realiza mediante solicitudes HTTP, como GET, POST, PUT, DELETE, etc.
+    
+-   **Recursos**: Los recursos (datos o servicios) se identifican mediante URLs únicas. Por ejemplo, en una API REST, una URL podría representar un recurso como un usuario o un producto.
+    
+-   **Métodos HTTP**:
+    
+    -   **GET**: Se utiliza para obtener datos de un recurso.
+    -   **POST**: Se usa para crear un nuevo recurso.
+    -   **PUT**: Actualiza un recurso existente.
+    -   **DELETE**: Elimina un recurso.
+
+ Esta API utilizará MongoDB y Docker. Breve explicación de cada uno:
+
+## MongoDB:
+
+MongoDB es una **base de datos NoSQL** orientada a documentos. A diferencia de las bases de datos tradicionales (como MySQL, PostgreSQL, etc.), que usan un modelo relacional y tablas para organizar los datos, MongoDB almacena los datos en **documentos BSON** (una extensión binaria de JSON), los cuales pueden tener una estructura flexible y anidada. Este enfoque permite manejar datos no estructurados o semiestructurados con facilidad, lo que lo hace ideal para ciertos tipos de aplicaciones. 
+
+Básicamente, es mas rápido ya que utiliza la escalabilidad horizontal (la carga se divide en nodos) y flexible, ya que podrías cambiar la forma de la "tabla" en cualquier momento, y seguir haciendo todo igual, agregando mínimos cambios.	
+
+## Docker:
+
+Docker es una herramienta que te permite empaquetar una aplicación y todas sus dependencias (como bibliotecas, configuraciones, etc.) en un contenedor. Este contenedor es como una "caja" donde la aplicación puede ejecutarse de manera aislada, sin preocuparte de los detalles del sistema operativo o las dependencias externas.
+
+-   **Desarrollar y probar aplicaciones**: Puedes crear entornos de desarrollo que son exactamente iguales en cualquier computadora. Esto elimina los problemas de "en mi computadora funciona".
+-   **Implementación de aplicaciones**: Al ser independiente del sistema operativo, el contenedor puede ejecutarse en cualquier lugar, ya sea tu máquina local, un servidor o en la nube.
+-   **Escalabilidad**: Puedes manejar aplicaciones que necesitan crecer rápidamente, ya que los contenedores se pueden crear y destruir de manera fácil.
+
+Entonces, si pasa algo, simplemente podes eliminar la imagen, y descargar otra.
+
+
+## ***Y de que sirve utilizar Docker para descargar una imagen de MongoDB?***
+
+Cuando alguien usa Docker para descargar una imagen de MongoDB, lo que está haciendo es obtener una "copia" de MongoDB lista para usarse dentro de un contenedor. MongoDB es una base de datos NoSQL, y en lugar de instalar MongoDB directamente en tu computadora o servidor, puedes simplemente ejecutar la imagen de Docker que ya contiene todo lo necesario para que MongoDB funcione correctamente.
+
+**Es consistente**: La imagen de Docker ya tiene configuraciones predefinidas y es igual en cualquier lugar donde la ejecutes, lo que asegura que el comportamiento de MongoDB sea consistente.
+**Esto le agrega portabilidad**: Si en el futuro necesitas mover MongoDB a otro servidor o entorno, solo necesitas mover la imagen de Docker y listo. No tienes que preocuparte de instalar MongoDB de nuevo.
+
+
+## Explicación de cada archivo.
+
+### .env:
+
+En  este archivo se guardaran las variables de entorno. Estas solo servirán en mi computadora.
+
+    PORT=3000
+    MONGO_URL=mongodb://mussiagus:123456@localhost:27017
+    MONGO_USER=mussiagus
+    MONGO_PASS=123456
+    MONGO_DB_NAME=games
+
+Si te fijas, esa URL contiene al usuario, la contraseña, y el puerto en el que funcionará la base de datos. El servidor como tal funcionará en el PORT que le mandemos.
+Bueno. Con la URL que está ahí, te podés conectar a la base de datos, desde (por ejemplo) MongoDB compass.
+
+### docker-compose.yml
+
+En este se guardan las configuraciones que implementará Docker al momento de correr la imagen de MongoDB.
+
+    version: '3.8'
+    services:
+    mongo-db:
+	    image: mongo:6.0.20
+	    restart: always
+	    environment:
+		    MONGO_INITDB_ROOT_USERNAME: mussiagus
+		    MONGO_INITDB_ROOT_PASSWORD: 123456
+	    volumes:
+		     - ./mongo:/date/db
+	    ports:
+		     - 27017:27017
+
+Ojo, que debe estar todo bien tabulado, porque sino no funciona.
+
+## src/app.js
+
+**Cosas que quizá no conozcas dentro de este archivo:**
+- **Mongoose**: Mongoose actúa como un **manejador de esquemas** y **modelo 		de datos** para MongoDB. Proporciona una manera sencilla y estructurada de definir, consultar, actualizar y eliminar datos dentro de una base de datos MongoDB. También es la herramienta que se utilizara para conectar/enlazar la base de datos.
+
+- **Body-parser**: Es un middleware que transforma el body de las solicitudes http en algo mas legible dentro del código. Por ejemplo, si la petición devuelve un URL_encoded, del estilo  `name=John&age=30`, body-parser lo transforma en un objeto común de JavaScript. Al igual que si solo se le pasara texto plano, este lo convertiría en una cadena de caracteres.
+
+**Volviendo al archivo...**
+
+Se importan las rutas, las cuales tendrán la lógica para cada tipo de solicitud. Se crea la instancia de express, para manejar las solicitudes HTTP, y le decimos que esta instancia utilizara body-parser. 
+Después se conecta a la base de datos, utilizando las credenciales del archivo **.env**. También, mas adelante se define la ruta por la que pasaran primero todas las solicitudes, la cual será `app.use('/games', gameRoutes)`.
+Finalmente se define el puerto, y se inicia el servidor ( con `app.listen` ).
+
+
+## src\models\games.models.js:
+
+En este archivo se crea la estructura de la tabla. No hay mucho mas. Simplemente un Schema que contenga las diferentes columnas, con sus respectivos tipos de datos. Después se exporta ( se utilizará dentro del siguiente archivo ).
+
+## src\routes\games.routes.js:
+
+Acá se guardarán las diferentes funciones que se utilizaran durante los tipos de petición (GET, POST, DELETE )
+
+Primero lo primero, además de importar  express (para poder manejar rutas), también hay que importar el modelo de la base de datos.
+
+### GET
+Es la mas fácil. Esta traerá todos los juegos existentes en la base de datos. Dentro de esta función, lo mas raro podría ser la creación de la variable "games", en donde se guardará el resultado de `Game.find()`.  
+Después de esto, y si la cantidad de juegos que encontró es mayor a cero, usando `res.status(200).json(games);` devolverá dentro de `res` (*o sea, la respuesta a la req*), el status (200 para indicar que todo fue bien) y games (donde se habían guardado todos los juegos) en forma de un **.json**
+
+### POST
+Tené en cuenta que al hacer un post, el cliente te esta mandando una **request** con contenido (que va a contener los datos para rellenar el nuevo juego a insertar en la BD). Por ese motivo, hay que desestructurar primero los datos de la req.
+
+Al hacer esto, se fija si están todos los campos bien insertados. Si es así, se crea una nueva "instancia" u objeto con la estructura de la base de datos, en la que se cargarán las variables desestructuradas. Finalmente, con `const  newGame  =  await  game.save();`  se guarda el nuevo objeto en la base de datos ( con game.save() ), y se crea una copia de este en "newGame", la cual después se transformará en un .json y se mostrará al cliente.
+
+***Pequeña aclaración***: vas a ver que al desestructurar, los datos se traen desde `req?.body`, y tiene sentido, ya que deben sacarse del cuerpo de la request, pero...**Qué es el "?"**.
+-   **`req?.body`** significa que **si `req` es un objeto válido (no es `null` ni `undefined`)**, entonces intentará acceder a la propiedad **`body`**.
+-   **Si `req` es `null` o `undefined`**, en lugar de lanzar un error, simplemente devolverá `undefined` y no intentará acceder a `req.body`.
